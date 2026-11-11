@@ -20,12 +20,16 @@ Planning and decisions happen outside this repo, in a separate claude.ai project
 
 **Undecided on purpose (decide after stage A):** demo for third parties (live URL, simple page) and protecting the public endpoint with an API key and rate limit.
 
-**To verify, do not assume:** which Bedrock models are available in the chosen region (check at block 2) and whether the AWS free plan blocks any service we need (ECS Fargate, ALB, Bedrock). The AWS account is on the free plan with credits; upgrading to the paid plan keeps unused credits.
+**AWS account facts (verified Nov 11, 2026):** free plan of the new AWS account type (with "Projects"), ~120 USD in credits, expires around Mar 25, 2027. No charges on the free plan; if credits run out, the account closes, so tear down costly resources every session. All services the project needs are included in the free plan (Bedrock, ECS, ECR, Elastic Load Balancing, VPC, S3, Systems Manager, CloudWatch, IAM, EC2). IAM Identity Center (SSO) is NOT available on this account type: local access uses an IAM user with MFA and an AWS CLI profile. Bedrock models are enabled by default; Anthropic models need a one-time use-case form. Titan Text Embeddings V2 runs in-region in eu-central-1.
+
+**To verify, do not assume:** Claude models in eu-central-1 (Frankfurt) are only available through cross-region inference, and the docs for this account type say cross-region features are not supported. Test Claude in Frankfurt at block 2; fallback region: eu-west-1 (Ireland) or eu-north-1 (Stockholm), where Claude Sonnet 5 is in-region. Also verify at the time: Kubernetes docs license (block 3), S3 native state locking in Terraform (block 9), NAT/ALB/Fargate prices (block 10). Upgrading to the paid plan keeps unused credits; only do it if the free plan blocks something.
 
 ## Current block
 Update this section at the start of each session.
-- Stage / block: A / block 0 (base and first commit)
-- Goal and "done when": local service answers `GET /health`, `pytest` passes, `ruff` is clean, everything is on GitHub.
+- Stage / block: A / block 2 (Thu Nov 12) — Bedrock access from the Mac. Blocks 0 and 1 are done (commit `aebbe95`).
+- Goal: a Python script talks to a Claude model and to the embeddings model on Bedrock.
+- Steps: IAM user (not root) with MFA + AWS CLI profile; in the Bedrock playground (Frankfurt) submit the Anthropic form and test Claude, switch region to eu-west-1 / eu-north-1 if it fails; fix region and model IDs; install `boto3`; smoke-test script in `scripts/` calling Claude and Titan Embeddings V2; region and model IDs from environment variables.
+- Done when: `aws sts get-caller-identity --profile <name>` returns the IAM user; the script prints a Claude answer and the embedding vector length; region and models recorded here under "Architecture and decisions"; no credentials in the repo.
 
 ## Who I work with
 The developer is learning Terraform, Kubernetes and CI/CD while building this. He must be able to explain every part of the project in a job interview without AI help. Reply to him in Spanish. Code, comments, commit messages, names and the README are in English.
@@ -53,6 +57,6 @@ Monthly AWS budget: 20 EUR (25 EUR if needed). Before suggesting anything that c
 
 ## Commands
 Fill these in as they exist:
-- Run locally: `uvicorn app.main:app --reload`
+- Run locally: `uvicorn main:app --reload`
 - Tests: `pytest`
 - Lint: `ruff check .`
