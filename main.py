@@ -1,8 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
+from ingestion import ingest_documents
 from models import AskRequest, AskResponse, IngestRequest, IngestResponse
 
 app = FastAPI()
+
+DOCS_DIR = "data/docs"
+INDEX_DIR = "data/index"
 
 @app.get("/health")
 def health_check():
@@ -18,4 +22,14 @@ def ask(request:AskRequest) -> AskResponse:
 
 @app.post("/ingest")
 def ingest(request:IngestRequest) -> IngestResponse:
-    return IngestResponse(status="ok", documents_count=len(request.documents))
+    try:
+        chunks_count = ingest_documents(request.documents, DOCS_DIR, INDEX_DIR)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return IngestResponse(
+        status="ok",
+        documents_count=len(request.documents),
+        chunks_count=chunks_count,
+    )

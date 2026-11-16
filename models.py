@@ -17,3 +17,4 @@ class IngestRequest(BaseModel):
 class IngestResponse(BaseModel):
     status: str
     documents_count: int
+    chunks_count: int
