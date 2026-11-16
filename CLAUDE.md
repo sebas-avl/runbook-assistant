@@ -6,7 +6,7 @@
 Planning and decisions happen outside this repo, in a separate claude.ai project. The developer tells you which block of the plan he is working on and what its goal is. If something he asks conflicts with what you already know about the project, ask which is current instead of assuming. Do not change the scope on your own: propose improvements as optional and state their cost in time.
 
 ## Architecture and decisions (already made)
-**App:** FastAPI with `POST /ingest` (split documents into chunks, embed with Bedrock, build a FAISS index), `POST /ask` (retrieve chunks, call a text model on Bedrock, answer with cited sources), `GET /health`, `GET /metrics`. The FAISS index is stored in S3 and loaded at startup. Documents: Kubernetes documentation (license to verify) plus the developer's own study notes; nothing private. Tests mock Bedrock. Minimal scope: if the AI part gets complicated, reduce it to a simple model call; the infrastructure is what matters.
+**App:** FastAPI with `POST /ingest` (split documents into chunks, embed with Bedrock, build a FAISS index), `POST /ask` (retrieve chunks, call a text model on Bedrock, answer with cited sources), `GET /health`, `GET /metrics`. Target design: the FAISS index is stored in S3 and loaded at startup (block 14). Until then it lives in `data/index/` on the local disk, and `/metrics` does not exist yet (stage B). Documents: Kubernetes documentation (CC BY 4.0, checked on the kubernetes.io footer; attribution in `data/docs/ATTRIBUTION.md`) plus the developer's own study notes; nothing private. Tests mock Bedrock. Minimal scope: if the AI part gets complicated, reduce it to a simple model call; the infrastructure is what matters.
 
 **Models (verified Nov 16, 2026, region eu-north-1):** embeddings with Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`), vector length 1024. Text model: Amazon Nova Lite through the inference profile `eu.amazon.nova-lite-v1:0` (routes to eu-central-1, eu-north-1, eu-west-1, eu-west-3), called with the Converse API. Claude is not used for now: the Anthropic use-case form asks for company data the developer does not have; it can be reconsidered later. Region, model IDs and profile come from environment variables (`AWS_REGION`, `EMBEDDING_MODEL_ID`, `TEXT_MODEL_ID`), never hard-coded.
 
@@ -24,14 +24,15 @@ Planning and decisions happen outside this repo, in a separate claude.ai project
 
 **AWS account facts (updated Nov 16, 2026):** free plan of the new AWS account type (with "Projects"), ~140 USD in credits (2 of 5 activities done), expires around Mar 25, 2027. No charges on the free plan; if credits run out, the account closes, so tear down costly resources every session. All services the project needs are included in the free plan (Bedrock, ECS, ECR, Elastic Load Balancing, VPC, S3, Systems Manager, CloudWatch, IAM, EC2). Project region: eu-north-1 (Stockholm). IAM Identity Center (SSO) is NOT available on this account type, and the console did not offer MFA for the IAM user: local access uses the IAM user `runbook-dev` (CLI only, no console password, no MFA) with the AWS CLI profile `runbook-dev` (activated with the shell alias `aws-runbook`; the `default` profile is empty on purpose). Bedrock inference quotas were 0 on the new account until AWS Support (case 179450495800211) fixed them; if a first call returns `ThrottlingException`, check Service Quotas before debugging code.
 
-**To verify, do not assume:** Kubernetes docs license (block 3), S3 native state locking in Terraform (block 9), NAT/ALB/Fargate prices (block 10), Nova Lite prices (Bedrock pricing page). Upgrading to the paid plan keeps unused credits; only do it if the free plan blocks something.
+**To verify, do not assume:** S3 native state locking in Terraform (block 9), NAT/ALB/Fargate prices (block 10), Nova Lite prices (Bedrock pricing page). Upgrading to the paid plan keeps unused credits; only do it if the free plan blocks something.
 
 ## Current block
 Update this section at the start of each session.
-- Stage / block: A / block 2 (Bedrock access from the Mac), working and documented. Block 1 is done. Block 3 started early: text chunking is done (`chunking.py`, chunk size 800, overlap 100, with tests).
-- Done in block 2: `aws sts get-caller-identity` returns `runbook-dev`; `scripts/bedrock_smoke.py` prints the Titan vector length (1024) and a Nova Lite answer (commit `c44767d`).
-- Next: block 3 (`/ingest` real): Kubernetes docs and license check, decide what `/ingest` receives, embeddings module (the boto3 call moves from the script into its own module), FAISS index, real `/ingest`.
-- Done when (block 3): see the plan; tests mock Bedrock.
+- Stage / block: A / block 3 (`/ingest` real) is DONE (Nov 16, 2026). Next: block 4 (`/ask` real).
+- Done in block 3: `/ingest` is real and tested. Modules: `chunking.py`, `embeddings.py` (Titan, cached client, adaptive retries against `ThrottlingException`), `vector_store.py` (FAISS `IndexFlatIP` with normalized vectors = cosine similarity: `build_index`, `save_index`, `load_index`, `search`), `ingestion.py` (`build_chunks` rejects names outside `data/docs/`, `ingest_documents`). `/ingest` takes a list of file names inside `data/docs/`, rebuilds the index from scratch every time, answers 400 (invalid name) or 404 (missing file). Real run: 3 documents, 191 chunks. 13 tests pass, none call AWS.
+- Next (block 4): load the index at startup (`load_index("data/index")`), embed the question, `search` top-k, similarity threshold (below it answer "I don't know" without calling the text model), prompt with context via the Converse API and Nova Lite, cite sources, write `eval/questions.md` (5 questions with expected source + 1 off-topic).
+- Done when (block 4): 5 of 5 questions answer with the right source; the off-topic question says it does not know; results noted in `eval/`.
+- To run `/ingest` or `/ask` for real: `aws-runbook`, export `AWS_REGION=eu-north-1`, `EMBEDDING_MODEL_ID`, `TEXT_MODEL_ID` in the same tab, start `uvicorn main:app --reload` from the repo root (paths are relative). A full ingest takes about 2 minutes (one Titan call per chunk).
 
 ## Who I work with
 The developer is learning Terraform, Kubernetes and CI/CD while building this. He must be able to explain every part of the project in a job interview without AI help. Reply to him in Spanish. Code, comments, commit messages, names and the README are in English.
@@ -56,6 +57,7 @@ Monthly AWS budget: 20 EUR (25 EUR if needed). Before suggesting anything that c
 - Python 3.12, FastAPI, pytest, ruff. Tests must not call Bedrock (mock it).
 - Small, frequent commits with clear messages. One logical change per commit.
 - Keep the code simple. Prefer clarity over cleverness.
+- `data/docs/` (Kubernetes docs with `ATTRIBUTION.md`) is committed; `data/index/` is generated by `/ingest` and git-ignored. Paths are relative: run the app from the repo root.
 - Files named `test_*.py` or `*_test.py` are collected by pytest: do not give that name to scripts that call AWS.
 
 ## Commands
