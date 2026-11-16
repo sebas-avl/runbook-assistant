@@ -6,7 +6,9 @@
 Planning and decisions happen outside this repo, in a separate claude.ai project. The developer tells you which block of the plan he is working on and what its goal is. If something he asks conflicts with what you already know about the project, ask which is current instead of assuming. Do not change the scope on your own: propose improvements as optional and state their cost in time.
 
 ## Architecture and decisions (already made)
-**App:** FastAPI with `POST /ingest` (split documents into chunks, embed with Bedrock, build a FAISS index), `POST /ask` (retrieve chunks, call a Claude model on Bedrock, answer with cited sources), `GET /health`, `GET /metrics`. The FAISS index is stored in S3 and loaded at startup. Documents: Kubernetes documentation (license to verify) plus the developer's own study notes; nothing private. Tests mock Bedrock. Minimal scope: if the AI part gets complicated, reduce it to a simple model call; the infrastructure is what matters.
+**App:** FastAPI with `POST /ingest` (split documents into chunks, embed with Bedrock, build a FAISS index), `POST /ask` (retrieve chunks, call a text model on Bedrock, answer with cited sources), `GET /health`, `GET /metrics`. The FAISS index is stored in S3 and loaded at startup. Documents: Kubernetes documentation (license to verify) plus the developer's own study notes; nothing private. Tests mock Bedrock. Minimal scope: if the AI part gets complicated, reduce it to a simple model call; the infrastructure is what matters.
+
+**Models (verified Nov 16, 2026, region eu-north-1):** embeddings with Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`), vector length 1024. Text model: Amazon Nova Lite through the inference profile `eu.amazon.nova-lite-v1:0` (routes to eu-central-1, eu-north-1, eu-west-1, eu-west-3), called with the Converse API. Claude is not used for now: the Anthropic use-case form asks for company data the developer does not have; it can be reconsidered later. Region, model IDs and profile come from environment variables (`AWS_REGION`, `EMBEDDING_MODEL_ID`, `TEXT_MODEL_ID`), never hard-coded.
 
 **Stage A:** Docker image in ECR; ECS Fargate behind an ALB. Terraform for everything (ECR, ECS, ALB, IAM, S3, CloudWatch, VPC with public/private subnets and security groups), organized in reusable modules with two environments (`dev` and `prod`, normally only `dev` is deployed), remote state in S3 with locking. GitHub Actions: on PR run ruff, pytest, Trivy (image and dependencies) and `terraform plan`; on merge build, push and deploy. AWS access from the pipeline via OIDC. App secrets in SSM Parameter Store. Structured logs to CloudWatch.
 
@@ -20,16 +22,16 @@ Planning and decisions happen outside this repo, in a separate claude.ai project
 
 **Undecided on purpose (decide after stage A):** demo for third parties (live URL, simple page) and protecting the public endpoint with an API key and rate limit.
 
-**AWS account facts (verified Nov 11, 2026):** free plan of the new AWS account type (with "Projects"), ~120 USD in credits, expires around Mar 25, 2027. No charges on the free plan; if credits run out, the account closes, so tear down costly resources every session. All services the project needs are included in the free plan (Bedrock, ECS, ECR, Elastic Load Balancing, VPC, S3, Systems Manager, CloudWatch, IAM, EC2). IAM Identity Center (SSO) is NOT available on this account type: local access uses an IAM user with MFA and an AWS CLI profile. Bedrock models are enabled by default; Anthropic models need a one-time use-case form. Titan Text Embeddings V2 runs in-region in eu-central-1.
+**AWS account facts (updated Nov 16, 2026):** free plan of the new AWS account type (with "Projects"), ~140 USD in credits (2 of 5 activities done), expires around Mar 25, 2027. No charges on the free plan; if credits run out, the account closes, so tear down costly resources every session. All services the project needs are included in the free plan (Bedrock, ECS, ECR, Elastic Load Balancing, VPC, S3, Systems Manager, CloudWatch, IAM, EC2). Project region: eu-north-1 (Stockholm). IAM Identity Center (SSO) is NOT available on this account type, and the console did not offer MFA for the IAM user: local access uses the IAM user `runbook-dev` (CLI only, no console password, no MFA) with the AWS CLI profile `runbook-dev` (activated with the shell alias `aws-runbook`; the `default` profile is empty on purpose). Bedrock inference quotas were 0 on the new account until AWS Support (case 179450495800211) fixed them; if a first call returns `ThrottlingException`, check Service Quotas before debugging code.
 
-**To verify, do not assume:** Claude models in eu-central-1 (Frankfurt) are only available through cross-region inference, and the docs for this account type say cross-region features are not supported. Test Claude in Frankfurt at block 2; fallback region: eu-west-1 (Ireland) or eu-north-1 (Stockholm), where Claude Sonnet 5 is in-region. Also verify at the time: Kubernetes docs license (block 3), S3 native state locking in Terraform (block 9), NAT/ALB/Fargate prices (block 10). Upgrading to the paid plan keeps unused credits; only do it if the free plan blocks something.
+**To verify, do not assume:** Kubernetes docs license (block 3), S3 native state locking in Terraform (block 9), NAT/ALB/Fargate prices (block 10), Nova Lite prices (Bedrock pricing page). Upgrading to the paid plan keeps unused credits; only do it if the free plan blocks something.
 
 ## Current block
 Update this section at the start of each session.
-- Stage / block: A / block 2 (Thu Nov 12) — Bedrock access from the Mac. Blocks 0 and 1 are done (commit `aebbe95`).
-- Goal: a Python script talks to a Claude model and to the embeddings model on Bedrock.
-- Steps: IAM user (not root) with MFA + AWS CLI profile; in the Bedrock playground (Frankfurt) submit the Anthropic form and test Claude, switch region to eu-west-1 / eu-north-1 if it fails; fix region and model IDs; install `boto3`; smoke-test script in `scripts/` calling Claude and Titan Embeddings V2; region and model IDs from environment variables.
-- Done when: `aws sts get-caller-identity --profile <name>` returns the IAM user; the script prints a Claude answer and the embedding vector length; region and models recorded here under "Architecture and decisions"; no credentials in the repo.
+- Stage / block: A / block 2 (Bedrock access from the Mac), working and documented. Block 1 is done. Block 3 started early: text chunking is done (`chunking.py`, chunk size 800, overlap 100, with tests).
+- Done in block 2: `aws sts get-caller-identity` returns `runbook-dev`; `scripts/bedrock_smoke.py` prints the Titan vector length (1024) and a Nova Lite answer (commit `c44767d`).
+- Next: block 3 (`/ingest` real): Kubernetes docs and license check, decide what `/ingest` receives, embeddings module (the boto3 call moves from the script into its own module), FAISS index, real `/ingest`.
+- Done when (block 3): see the plan; tests mock Bedrock.
 
 ## Who I work with
 The developer is learning Terraform, Kubernetes and CI/CD while building this. He must be able to explain every part of the project in a job interview without AI help. Reply to him in Spanish. Code, comments, commit messages, names and the README are in English.
@@ -54,9 +56,11 @@ Monthly AWS budget: 20 EUR (25 EUR if needed). Before suggesting anything that c
 - Python 3.12, FastAPI, pytest, ruff. Tests must not call Bedrock (mock it).
 - Small, frequent commits with clear messages. One logical change per commit.
 - Keep the code simple. Prefer clarity over cleverness.
+- Files named `test_*.py` or `*_test.py` are collected by pytest: do not give that name to scripts that call AWS.
 
 ## Commands
 Fill these in as they exist:
 - Run locally: `uvicorn main:app --reload`
 - Tests: `pytest`
 - Lint: `ruff check .`
+- Bedrock smoke test (needs `aws-runbook` and the env vars `AWS_REGION`, `EMBEDDING_MODEL_ID`, `TEXT_MODEL_ID`): `python scripts/bedrock_smoke.py`
