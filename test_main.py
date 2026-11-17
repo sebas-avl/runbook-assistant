@@ -46,3 +46,25 @@ def test_ingest_document_not_found():
 def test_ingest_rejects_path_traversal():
     response = client.post("/ingest", json={"documents": ["../README.md"]})
     assert response.status_code == 400
+
+def test_ask_without_relevant_context(monkeypatch):
+    fake_chunks = [{"text": "A Pod is the smallest unit.", "source": "pods.md", "score": 0.1}]
+    monkeypatch.setattr("main.retrieve", lambda question, index_dir: fake_chunks)
+    
+    # Trap: if /ask calls the text model, this makes the test fail.
+    def fail_if_called(prompt):
+        raise AssertionError("the text model must not be called")
+
+    monkeypatch.setattr("main.generate_answer", fail_if_called)
+    response = client.post("/ask", json={"question": "What is the best pizza recipe?"})
+    assert response.status_code == 200
+    assert response.json() == {"answer": "I don't know", "sources": []}
+
+def test_ask_without_index(tmp_path, monkeypatch):
+    monkeypatch.setattr("main.INDEX_DIR", str(tmp_path / "no-index"))
+    response = client.post("/ask", json={"question": "What is a Pod?"})
+    assert response.status_code == 404
+
+def test_ask_rejects_missing_question():
+    response = client.post("/ask", json={})
+    assert response.status_code == 422
