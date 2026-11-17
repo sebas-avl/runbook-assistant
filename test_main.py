@@ -14,10 +14,13 @@ def test_root():
     assert response.status_code == 200
     assert response.json() == {"message":"Runbook Assistant"}
 
-def test_ask():
-    response = client.post("/ask", json={"question": "what is kubernetes?"})
+def test_ask(monkeypatch):
+    fake_chunks = [{"text": "A Pod is the smallest unit.", "source": "pods.md", "score": 0.8}]
+    monkeypatch.setattr("main.retrieve", lambda question, index_dir: fake_chunks)
+    monkeypatch.setattr("main.generate_answer", lambda prompt: "fake answer")
+    response = client.post("/ask", json={"question": "what is a pod?"})
     assert response.status_code == 200
-    assert response.json() == {"answer": "this is an example answer", "sources": ["example.md"]}
+    assert response.json() == {"answer": "fake answer", "sources": ["pods.md"]}
 
 def test_ingest(tmp_path, monkeypatch):
     docs_dir = tmp_path / "docs"
