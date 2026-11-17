@@ -21,6 +21,8 @@ def save_index(index: faiss.IndexFlatIP, chunks: list[dict[str, str]], directory
 
 def load_index(directory: str) -> tuple[faiss.IndexFlatIP, list[dict[str, str]]]:
     path = Path(directory)
+    if not (path / "index.faiss").exists():
+        raise FileNotFoundError(f"No index found in {directory}")
     index = faiss.read_index(str(path / "index.faiss"))
     chunks = json.loads((path / "metadata.json").read_text(encoding="utf-8"))
     return index, chunks
