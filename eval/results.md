@@ -18,3 +18,4 @@ Run on 2026-11-17 against `POST /ask` with the three Kubernetes docs in `data/do
 - Question 2: the YAML in the answer is cut off, because chunks are split every 800 characters without respecting lines.
 - Question 3: the source is right, but the answer talks about pausing a rollout instead of rolling updates.
 - Retrieved chunks contain leftovers from the Kubernetes site generator (`{{< ... >}}` tags).
+- Other documents (2026-11-17): with this repository's README as the only document, "Which Python version does the project need?" scored 0.169 and the requirements chunk was not in the top 3, so `/ask` answered "I don't know". "What do I need to run the project locally?" found it with 0.251. Character-based chunking mixes sections, so short, specific questions can miss details.

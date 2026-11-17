@@ -59,6 +59,10 @@ This calls Titan once per chunk (about 190 calls) and takes about two minutes. E
 {"status":"ok","documents_count":3,"chunks_count":191}
 ```
 
+To index your own documents, put Markdown or plain-text files in `data/docs/` and list their names in the request. Each call rebuilds the index from only the files you list.
+
+Chunking and the `0.25` threshold were tuned on the Kubernetes documents; with other documents, retrieval quality may drop (see `eval/results.md`).
+
 ### Ask a question
 
 ```bash
