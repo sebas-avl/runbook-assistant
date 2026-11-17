@@ -25,3 +25,8 @@ def test_save_and_load_roundtrip(tmp_path):
     loaded_index, loaded_chunks = load_index(str(tmp_path))
     assert loaded_index.ntotal == 3
     assert loaded_chunks == CHUNKS
+
+def test_search_skips_missing_results():
+    index = build_index(VECTORS)
+    results = search(index, CHUNKS, [1.0, 0.1], k=5)
+    assert len(results) == 3

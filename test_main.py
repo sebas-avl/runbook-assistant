@@ -68,3 +68,7 @@ def test_ask_without_index(tmp_path, monkeypatch):
 def test_ask_rejects_missing_question():
     response = client.post("/ask", json={})
     assert response.status_code == 422
+
+def test_ingest_rejects_empty_list():
+    response = client.post("/ingest", json={"documents": []})
+    assert response.status_code == 400
