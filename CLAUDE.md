@@ -20,6 +20,8 @@ eval/              Questions with expected sources, and the latest results.
 
 ## Commands
 
+- Install: `pip install -r requirements-dev.txt` (app + test and lint tools; the
+  Docker image installs only `requirements.txt`).
 - Run: `uvicorn main:app --reload` from the repo root (paths are relative).
 - Test: `pytest` (one test: `pytest test_main.py::test_ask`). Lint: `ruff check .`
 - Coverage: `pytest --cov=. --cov-report=term-missing` (only the real Bedrock
@@ -47,6 +49,9 @@ eval/              Questions with expected sources, and the latest results.
 - **`MIN_SCORE` (0.25) was tuned on 6 questions.** After changing it, the
   chunking or `k`, rerun `eval/` and record the results. Never change an expected
   source without writing why.
+- **Don't run `pip freeze > requirements.txt`.** It mixes the test tools back
+  into the app's list and they end up in the image. App packages go in
+  `requirements.txt`, test and lint tools in `requirements-dev.txt`, pinned.
 - **`ThrottlingException` on a first Bedrock call is a quota, not a bug.** New
   accounts can start with inference quotas at 0; check Service Quotas.
 

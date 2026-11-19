@@ -96,6 +96,7 @@ flowchart LR
 ## Testing and evaluation
 
 ```bash
+pip install -r requirements-dev.txt
 pytest --cov=. --cov-report=term-missing
 ruff check .
 ```
