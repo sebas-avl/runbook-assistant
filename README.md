@@ -4,8 +4,8 @@ A small RAG service on Amazon Bedrock that answers questions about technical doc
 
 ## Status
 
-- **Done:** the API runs locally, with tests that need no AWS credentials.
-- **Next:** Docker image, CI with GitHub Actions and Trivy, AWS infrastructure with Terraform (ECS Fargate behind a load balancer), then the same service on Kubernetes.
+- **Done:** the API runs locally and in a Docker image, with tests that need no AWS credentials.
+- **Next:** CI with GitHub Actions and Trivy, AWS infrastructure with Terraform (ECS Fargate behind a load balancer), then the same service on Kubernetes.
 
 ## Run locally
 
@@ -75,6 +75,23 @@ The answer comes with its sources (`"sources": ["pods.md"]`). A question the doc
 
 > [!NOTE]
 > `/ingest` and `/ask` call Amazon Bedrock and are billed to your AWS account (a few cents for these three documents).
+
+## Run with Docker
+
+```bash
+docker build --platform linux/amd64 -t runbook-assistant:dev .
+docker run --rm -p 8000:8000 \
+  -v ~/.aws:/home/appuser/.aws:ro \
+  -e AWS_PROFILE=<your-profile> \
+  -e AWS_REGION=eu-north-1 \
+  -e EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0 \
+  -e TEXT_MODEL_ID=eu.amazon.nova-lite-v1:0 \
+  runbook-assistant:dev
+```
+
+On an Apple Silicon Mac, Docker warns that the image platform (`linux/amd64`) does not match the host; the image is built for AWS Fargate and runs emulated, a bit slower.
+
+The image contains no credentials: your AWS profile is mounted read-only when the container starts. Build the index with `POST /ingest` as above; it lives inside the container and is lost when the container is removed.
 
 ## How it works
 

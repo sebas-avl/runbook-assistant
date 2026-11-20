@@ -3,8 +3,8 @@
 A FastAPI service that answers questions about technical documentation with
 RAG on Amazon Bedrock and cites its sources. The app is deliberately small; the
 repo is about deploying and operating it (Docker, Terraform, ECS, GitHub Actions,
-later Kubernetes). Only the app exists so far. See README.md for setup and how
-it works.
+later Kubernetes). The app and its Docker image exist so far. See README.md for
+setup and how it works.
 
 ## Layout
 
@@ -27,6 +27,8 @@ eval/              Questions with expected sources, and the latest results.
 - Coverage: `pytest --cov=. --cov-report=term-missing` (only the real Bedrock
   calls stay uncovered, on purpose).
 - Bedrock connection check: `python scripts/bedrock_smoke.py`
+- Docker: `docker build --platform linux/amd64 -t runbook-assistant:dev .` (run
+  command in README.md).
 
 ## Things that will bite you
 
@@ -52,6 +54,14 @@ eval/              Questions with expected sources, and the latest results.
 - **Don't run `pip freeze > requirements.txt`.** It mixes the test tools back
   into the app's list and they end up in the image. App packages go in
   `requirements.txt`, test and lint tools in `requirements-dev.txt`, pinned.
+- **Build for `linux/amd64`.** Fargate runs x86; an image built on an Apple
+  Silicon Mac without `--platform` is ARM and will not start there.
+- **The container runs as `appuser` and can only write to `data/index/`.**
+  Writing anywhere else fails with `PermissionError`; change the `chown` in the
+  Dockerfile if the app needs a new writable folder.
+- **The image copies only `*.py` from the root and `data/docs/`.** A new folder
+  the app needs must get its own `COPY`; `test_*.py` and secrets are excluded by
+  `.dockerignore`.
 - **`ThrottlingException` on a first Bedrock call is a quota, not a bug.** New
   accounts can start with inference quotas at 0; check Service Quotas.
 
