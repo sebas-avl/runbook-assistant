@@ -3,8 +3,8 @@
 A FastAPI service that answers questions about technical documentation with
 RAG on Amazon Bedrock and cites its sources. The app is deliberately small; the
 repo is about deploying and operating it (Docker, Terraform, ECS, GitHub Actions,
-later Kubernetes). The app and its Docker image exist so far. See README.md for
-setup and how it works.
+later Kubernetes). The app, its Docker image and CI (GitHub Actions) exist so
+far. See README.md for setup and how it works.
 
 ## Layout
 
@@ -16,6 +16,7 @@ generation.py      Prompt + Nova Lite call (Converse API).
 data/docs/         Source docs (Kubernetes, CC BY 4.0, committed).
 data/index/        Built by POST /ingest. Git-ignored.
 eval/              Questions with expected sources, and the latest results.
+.github/workflows/ CI: ruff and pytest on every pull request.
 ```
 
 ## Commands
@@ -62,10 +63,14 @@ eval/              Questions with expected sources, and the latest results.
 - **The image copies only `*.py` from the root and `data/docs/`.** A new folder
   the app needs must get its own `COPY`; `test_*.py` and secrets are excluded by
   `.dockerignore`.
+- **`main` is protected.** Direct pushes are rejected: work on a branch and open
+  a PR. The required check is named after the CI job (`test`); renaming the job
+  blocks every merge until the ruleset is updated.
 - **`ThrottlingException` on a first Bedrock call is a quota, not a bug.** New
   accounts can start with inference quotas at 0; check Service Quotas.
 
 ## Working agreement
 
-Code, comments and commits in English. One logical change per commit. Ask
-before creating, changing or destroying AWS resources.
+Code, comments and commits in English. One logical change per commit. Work on a
+branch and merge through a pull request. Ask before creating, changing or
+destroying AWS resources.
