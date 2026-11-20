@@ -7,7 +7,7 @@ client = TestClient(app) #creates an instance of TestClient that is connected to
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200  #succesful
-    assert response.json() == {"status":"broken"}
+    assert response.json() == {"status":"ok"}
 
 def test_root():
     response = client.get("/")
