@@ -16,7 +16,8 @@ generation.py      Prompt + Nova Lite call (Converse API).
 data/docs/         Source docs (Kubernetes, CC BY 4.0, committed).
 data/index/        Built by POST /ingest. Git-ignored.
 eval/              Questions with expected sources, and the latest results.
-.github/workflows/ CI: ruff and pytest on every pull request.
+.github/workflows/ CI on every pull request and push to main: job test (ruff,
+                   pytest) and job scan (Trivy on the image and dependencies).
 ```
 
 ## Commands
@@ -64,8 +65,11 @@ eval/              Questions with expected sources, and the latest results.
   the app needs must get its own `COPY`; `test_*.py` and secrets are excluded by
   `.dockerignore`.
 - **`main` is protected.** Direct pushes are rejected: work on a branch and open
-  a PR. The required check is named after the CI job (`test`); renaming the job
-  blocks every merge until the ruleset is updated.
+  a PR. The required checks are named after the CI jobs (`test` and `scan`);
+  renaming a job blocks every merge until the ruleset is updated.
+- **`scan` fails on any CRITICAL vulnerability that has a fix.** In the image or
+  in either requirements file. Fix it by upgrading the package; don't loosen
+  the Trivy settings in `ci.yml`.
 - **`ThrottlingException` on a first Bedrock call is a quota, not a bug.** New
   accounts can start with inference quotas at 0; check Service Quotas.
 
