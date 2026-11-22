@@ -1,11 +1,13 @@
 # Runbook Assistant
 
+[![CI](https://github.com/sebas-avl/runbook-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/sebas-avl/runbook-assistant/actions/workflows/ci.yml)
+
 A small RAG service on Amazon Bedrock that answers questions about technical documentation and cites its sources. The app is deliberately simple: the point of this repository is how it is tested, packaged, deployed and operated (Docker, AWS with Terraform, CI/CD, Kubernetes).
 
 ## Status
 
-- **Done:** the API runs locally and in a Docker image, with tests that need no AWS credentials, run by CI on every pull request.
-- **Next:** Trivy, AWS infrastructure with Terraform (ECS Fargate behind a load balancer), then the same service on Kubernetes.
+- **Done:** the API runs locally and in a Docker image, with tests that need no AWS credentials. CI runs them on every pull request and scans the image and dependencies with Trivy.
+- **Next:** AWS infrastructure with Terraform (ECS Fargate behind a load balancer), then the same service on Kubernetes.
 
 ## Run locally
 
