@@ -27,3 +27,29 @@ jobs:
 
       - name: Pytest
         run: pytest
+  
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7 
+      
+      - name: Build image
+        run: docker build -t runbook-assistant:ci .
+
+      - name: Scan Image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: runbook-assistant:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+        
+      - name: Scan dependencies
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: .
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
