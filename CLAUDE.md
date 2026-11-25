@@ -3,8 +3,9 @@
 A FastAPI service that answers questions about technical documentation with
 RAG on Amazon Bedrock and cites its sources. The app is deliberately small; the
 repo is about deploying and operating it (Docker, Terraform, ECS, GitHub Actions,
-later Kubernetes). The app, its Docker image, CI (GitHub Actions) and the
-Terraform remote state exist so far. See README.md for setup and how it works.
+later Kubernetes). The app, its Docker image, CI (GitHub Actions), the
+Terraform remote state and the AWS network exist so far. See README.md for
+setup and how it works.
 
 ## Layout
 
@@ -20,6 +21,8 @@ eval/              Questions with expected sources, and the latest results.
                    pytest) and job scan (Trivy on the image and dependencies).
 infra/bootstrap/   Terraform: the S3 bucket for remote state. State kept locally.
 infra/app/         Terraform: the app infrastructure. State in the S3 bucket.
+                   network.tf: VPC, subnets, IGW, NAT, route tables, SGs.
+docs/              Architecture diagram (network.png) and network.md.
 ```
 
 ## Commands
@@ -82,10 +85,16 @@ infra/app/         Terraform: the app infrastructure. State in the S3 bucket.
 - **`infra/bootstrap/` keeps its state only on the Mac.** If it is lost,
   re-import the four bucket resources with `terraform import`; never re-apply
   blindly.
+- **The NAT Gateway and its Elastic IP bill per hour.** Run `terraform destroy`
+  in `infra/app/` after every session and check in the console that no NAT
+  Gateway or Elastic IP is left.
+- **`docs/network.png` must match `network.tf`.** Update the diagram and
+  `docs/network.md` in the same PR as any network change.
 - **`runbook-dev` has least-privilege IAM.** Its policy `runbook-terraform` only
-  allows the state bucket and the key `app/terraform.tfstate`. A new state key
-  or a new AWS service needs the policy updated first; add permissions from the
-  `AccessDenied` message.
+  allows the state bucket, the key `app/terraform.tfstate` and the network
+  actions (EC2/VPC) in `eu-north-1`. A new state key or a new AWS service
+  needs the policy updated first; add permissions from the `AccessDenied`
+  message.
 
 ## Working agreement
 
