@@ -3,8 +3,8 @@
 A FastAPI service that answers questions about technical documentation with
 RAG on Amazon Bedrock and cites its sources. The app is deliberately small; the
 repo is about deploying and operating it (Docker, Terraform, ECS, GitHub Actions,
-later Kubernetes). The app, its Docker image and CI (GitHub Actions) exist so
-far. See README.md for setup and how it works.
+later Kubernetes). The app, its Docker image, CI (GitHub Actions) and the
+Terraform remote state exist so far. See README.md for setup and how it works.
 
 ## Layout
 
@@ -18,6 +18,8 @@ data/index/        Built by POST /ingest. Git-ignored.
 eval/              Questions with expected sources, and the latest results.
 .github/workflows/ CI on every pull request and push to main: job test (ruff,
                    pytest) and job scan (Trivy on the image and dependencies).
+infra/bootstrap/   Terraform: the S3 bucket for remote state. State kept locally.
+infra/app/         Terraform: the app infrastructure. State in the S3 bucket.
 ```
 
 ## Commands
@@ -31,6 +33,8 @@ eval/              Questions with expected sources, and the latest results.
 - Bedrock connection check: `python scripts/bedrock_smoke.py`
 - Docker: `docker build --platform linux/amd64 -t runbook-assistant:dev .` (run
   command in README.md).
+- Terraform: from `infra/bootstrap/` or `infra/app/`, `terraform init`,
+  `terraform fmt`, `terraform plan`. Needs `AWS_PROFILE=runbook-dev` in the tab.
 
 ## Things that will bite you
 
@@ -72,6 +76,16 @@ eval/              Questions with expected sources, and the latest results.
   the Trivy settings in `ci.yml`.
 - **`ThrottlingException` on a first Bedrock call is a quota, not a bug.** New
   accounts can start with inference quotas at 0; check Service Quotas.
+- **Never commit Terraform state.** `*.tfstate` and `.terraform/` are
+  git-ignored; `.terraform.lock.hcl` is committed on purpose so every machine
+  uses the same provider version.
+- **`infra/bootstrap/` keeps its state only on the Mac.** If it is lost,
+  re-import the four bucket resources with `terraform import`; never re-apply
+  blindly.
+- **`runbook-dev` has least-privilege IAM.** Its policy `runbook-terraform` only
+  allows the state bucket and the key `app/terraform.tfstate`. A new state key
+  or a new AWS service needs the policy updated first; add permissions from the
+  `AccessDenied` message.
 
 ## Working agreement
 
