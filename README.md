@@ -6,8 +6,8 @@ A small RAG service on Amazon Bedrock that answers questions about technical doc
 
 ## Status
 
-- **Done:** the API runs locally and in a Docker image, with tests that need no AWS credentials. CI runs them on every pull request and scans the image and dependencies with Trivy.
-- **Next:** AWS infrastructure with Terraform (ECS Fargate behind a load balancer), then the same service on Kubernetes.
+- **Done:** the API runs locally and in a Docker image, with tests that need no AWS credentials. CI runs them on every pull request and scans the image and dependencies with Trivy. Terraform remote state: an S3 bucket with versioning, encryption and native state locking.
+- **Next:** AWS network (VPC) and ECS Fargate behind a load balancer with Terraform, then the same service on Kubernetes.
 
 ## Run locally
 
