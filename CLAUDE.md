@@ -4,8 +4,8 @@ A FastAPI service that answers questions about technical documentation with
 RAG on Amazon Bedrock and cites its sources. The app is deliberately small; the
 repo is about deploying and operating it (Docker, Terraform, ECS, GitHub Actions,
 later Kubernetes). The app, its Docker image, CI (GitHub Actions), the
-Terraform remote state and the AWS network exist so far. See README.md for
-setup and how it works.
+Terraform remote state, the AWS network and the ECR repository exist so far.
+See README.md for setup and how it works.
 
 ## Layout
 
@@ -19,8 +19,12 @@ data/index/        Built by POST /ingest. Git-ignored.
 eval/              Questions with expected sources, and the latest results.
 .github/workflows/ CI on every pull request and push to main: job test (ruff,
                    pytest) and job scan (Trivy on the image and dependencies).
-infra/bootstrap/   Terraform: the S3 bucket for remote state. State kept locally.
-infra/app/         Terraform: the app infrastructure. State in the S3 bucket.
+infra/bootstrap/   Terraform: the S3 bucket for remote state. Its own state lives
+                   in that bucket (key bootstrap/terraform.tfstate).
+infra/persistent/  Terraform: what survives sessions (ECR repository). Never
+                   destroyed at the end of a session.
+infra/app/         Terraform: what runs and bills by the hour. Destroyed after
+                   every session. State in the S3 bucket.
                    network.tf: VPC, subnets, IGW, NAT, route tables, SGs.
 docs/              Architecture diagram (network.png) and network.md.
 ```
@@ -36,8 +40,16 @@ docs/              Architecture diagram (network.png) and network.md.
 - Bedrock connection check: `python scripts/bedrock_smoke.py`
 - Docker: `docker build --platform linux/amd64 -t runbook-assistant:dev .` (run
   command in README.md).
-- Terraform: from `infra/bootstrap/` or `infra/app/`, `terraform init`,
-  `terraform fmt`, `terraform plan`. Needs `AWS_PROFILE=runbook-dev` in the tab.
+- Terraform: from `infra/bootstrap/`, `infra/persistent/` or `infra/app/`,
+  `terraform init`, `terraform fmt`, `terraform validate`, `terraform plan`.
+  Needs `AWS_PROFILE=runbook-dev` in the tab.
+- Push the image to ECR: in `infra/persistent/`,
+  `REPO=$(terraform output -raw repository_url)`,
+  `TAG=$(git rev-parse --short HEAD)` and
+  `REGISTRY=$(echo $REPO | cut -d/ -f1)`; then
+  `aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin $REGISTRY`,
+  and from the repo root
+  `docker build --platform linux/amd64 -t $REPO:$TAG .` and `docker push $REPO:$TAG`.
 
 ## Things that will bite you
 
@@ -82,19 +94,25 @@ docs/              Architecture diagram (network.png) and network.md.
 - **Never commit Terraform state.** `*.tfstate` and `.terraform/` are
   git-ignored; `.terraform.lock.hcl` is committed on purpose so every machine
   uses the same provider version.
-- **`infra/bootstrap/` keeps its state only on the Mac.** If it is lost,
-  re-import the four bucket resources with `terraform import`; never re-apply
-  blindly.
+- **`infra/bootstrap/` stores its state in the bucket it creates.** If the
+  bucket were ever lost, remove the `backend` block and run
+  `terraform init -migrate-state` to go back to local state before re-creating
+  it; existing resources are recovered with `terraform import`.
+- **Nothing persistent goes in `infra/app/`.** Its `destroy` runs after every
+  session; ECR, data and IAM belong in `infra/persistent/`.
+- **ECR tags are immutable.** One commit, one image: pushing an existing tag
+  fails. Tag with `git rev-parse --short HEAD` and recompute `TAG` after every
+  commit or merge; a shell variable does not update itself.
 - **The NAT Gateway and its Elastic IP bill per hour.** Run `terraform destroy`
   in `infra/app/` after every session and check in the console that no NAT
   Gateway or Elastic IP is left.
 - **`docs/network.png` must match `network.tf`.** Update the diagram and
   `docs/network.md` in the same PR as any network change.
 - **`runbook-dev` has least-privilege IAM.** Its policy `runbook-terraform` only
-  allows the state bucket, the key `app/terraform.tfstate` and the network
-  actions (EC2/VPC) in `eu-north-1`. A new state key or a new AWS service
-  needs the policy updated first; add permissions from the `AccessDenied`
-  message.
+  allows the state bucket, the keys `app/`, `persistent/` and `bootstrap/`,
+  the network actions (EC2/VPC) in `eu-north-1` and the `runbook-assistant` ECR
+  repository. A new state key or a new AWS service needs the policy updated
+  first; add permissions from the `AccessDenied` message.
 
 ## Working agreement
 
