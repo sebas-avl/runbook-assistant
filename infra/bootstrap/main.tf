@@ -5,6 +5,13 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  backend "s3" {
+    bucket       = "runbook-assistant-tfstate-sebas-avl"
+    key          = "bootstrap/terraform.tfstate"
+    region       = "eu-north-1"
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
